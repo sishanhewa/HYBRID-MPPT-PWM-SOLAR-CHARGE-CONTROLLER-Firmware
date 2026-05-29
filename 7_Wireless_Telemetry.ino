@@ -76,9 +76,9 @@ void pushTelemetryToSupabase() {
   doc["peakPower"]        = peakPower;
   
   doc["temperature"]      = temperature;
-  doc["fanStatus"]        = fanStatus;
-  doc["buckEnable"]       = buckEnable;
-  doc["bypassEnable"]     = bypassEnable;
+  doc["fanStatus"]        = (int)fanStatus;
+  doc["buckEnable"]       = (int)buckEnable;
+  doc["bypassEnable"]     = (int)bypassEnable;
   doc["inputSource"]      = inputSource;
   doc["chargeState"]      = chargeState;
   doc["daysRunning"]      = daysRunning;
@@ -91,18 +91,18 @@ void pushTelemetryToSupabase() {
   doc["pwmMax"]           = pwmMax;
   doc["pwmMaxLimited"]    = pwmMaxLimited;
   
-  doc["MPPT_Mode"]        = MPPT_Mode;
-  doc["output_Mode"]      = output_Mode;
+  doc["MPPT_Mode"]        = (int)MPPT_Mode;
+  doc["output_Mode"]      = (int)output_Mode;
   
   doc["ERR"]              = ERR;
-  doc["FLV"]              = FLV;
-  doc["BNC"]              = BNC;
-  doc["IUV"]              = IUV;
-  doc["IOC"]              = IOC;
-  doc["OOV"]              = OOV;
-  doc["OOC"]              = OOC;
-  doc["OTE"]              = OTE;
-  doc["REC"]              = REC;
+  doc["FLV"]              = (int)FLV;
+  doc["BNC"]              = (int)BNC;
+  doc["IUV"]              = (int)IUV;
+  doc["IOC"]              = (int)IOC;
+  doc["OOV"]              = (int)OOV;
+  doc["OOC"]              = (int)OOC;
+  doc["OTE"]              = (int)OTE;
+  doc["REC"]              = (int)REC;
 
   String requestBody;
   serializeJson(doc, requestBody);
@@ -113,6 +113,10 @@ void pushTelemetryToSupabase() {
     if (httpResponseCode != 200 && httpResponseCode != 204) {
       Serial.print("> Supabase Telemetry Push Error: ");
       Serial.println(httpResponseCode);
+      Serial.print("> Reason: ");
+      Serial.println(http.getString());
+      Serial.print("> Payload Sent: ");
+      Serial.println(requestBody);
     }
   } else {
     Serial.print("> Supabase Connection Error: ");
