@@ -51,9 +51,11 @@ void Wireless_Telemetry() {
 void pushTelemetryToSupabase() {
   if (supabaseUrl == "https://your-project-id.supabase.co") return; // Not configured
 
+  WiFiClientSecure client;
+  client.setInsecure(); // Disable strict certificate checking
   HTTPClient http;
   String url = supabaseUrl + "/rest/v1/telemetry_data?id=eq.1";
-  http.begin(url);
+  http.begin(client, url);
   http.addHeader("apikey", supabaseKey);
   http.addHeader("Authorization", "Bearer " + supabaseKey);
   http.addHeader("Content-Type", "application/json");
@@ -123,9 +125,11 @@ void pushTelemetryToSupabase() {
 void pullSettingsFromSupabase() {
   if (supabaseUrl == "https://your-project-id.supabase.co") return; // Not configured
 
+  WiFiClientSecure client;
+  client.setInsecure();
   HTTPClient http;
   String url = supabaseUrl + "/rest/v1/device_settings?id=eq.1&select=*";
-  http.begin(url);
+  http.begin(client, url);
   http.addHeader("apikey", supabaseKey);
   http.addHeader("Authorization", "Bearer " + supabaseKey);
 
@@ -195,9 +199,11 @@ void pullSettingsFromSupabase() {
 }
 
 void clearFactoryResetFlag() {
+  WiFiClientSecure client;
+  client.setInsecure();
   HTTPClient http;
   String url = supabaseUrl + "/rest/v1/device_settings?id=eq.1";
-  http.begin(url);
+  http.begin(client, url);
   http.addHeader("apikey", supabaseKey);
   http.addHeader("Authorization", "Bearer " + supabaseKey);
   http.addHeader("Content-Type", "application/json");

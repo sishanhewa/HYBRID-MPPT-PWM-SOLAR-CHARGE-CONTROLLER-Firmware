@@ -14,6 +14,7 @@ firmwareContactR2 = "S.A.Wickramasinghe";
 #include <ArduinoJson.h>            // Use version 6.x
 #include <WiFi.h>                   // Standard WiFi Library
 #include <HTTPClient.h>             // Required for Supabase REST API requests
+#include <WiFiClientSecure.h>       // Required for HTTPS requests to Supabase
 
 // ========================================= SUPABASE CONFIG =======================================//
 // Enter your Supabase REST URL and ANON KEY here
