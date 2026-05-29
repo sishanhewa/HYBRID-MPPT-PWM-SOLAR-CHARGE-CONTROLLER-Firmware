@@ -1,3 +1,8 @@
+unsigned long lastTelemetrySync = 0;
+unsigned long lastSettingsSync = 0;
+const unsigned long TELEMETRY_INTERVAL = 5000;  // 5 seconds
+const unsigned long SETTINGS_INTERVAL = 10000;  // 10 seconds
+
 void setupWiFi() {
   if (enableWiFi == 1) {
     Serial.print("> Connecting to WiFi: ");
@@ -14,191 +19,190 @@ void setupWiFi() {
     
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println("\n> WiFi Connected!");
-      Serial.print("> Access Dashboard at: http://");
+      Serial.print("> Local IP: ");
       Serial.println(WiFi.localIP());
-
-      // =================== CORS PREFLIGHT HANDLER ===================
-      // Handles browser OPTIONS preflight requests for cross-origin access
-      server.on("/api/*", HTTP_OPTIONS, [](AsyncWebServerRequest *request){
-        AsyncWebServerResponse *response = request->beginResponse(204);
-        response->addHeader("Access-Control-Allow-Origin", "*");
-        response->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        response->addHeader("Access-Control-Allow-Headers", "Content-Type");
-        response->addHeader("Access-Control-Max-Age", "86400");
-        request->send(response);
-      });
-
-      // =================== ROOT PAGE ===================
-      // Serves the minimal info page with API endpoint documentation
-      server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html);
-        response->addHeader("Access-Control-Allow-Origin", "*");
-        request->send(response);
-      });
-
-      // =================== TELEMETRY DATA API ===================
-      // GET /api/data - Returns all real-time telemetry data as JSON
-      server.on("/api/data", HTTP_GET, [](AsyncWebServerRequest *request){
-        StaticJsonDocument<1024> doc;
-        
-        // Power & Energy
-        doc["powerInput"]       = powerInput;
-        doc["powerOutput"]      = powerOutput;
-        doc["voltageInput"]     = voltageInput;
-        doc["voltageOutput"]    = voltageOutput;
-        doc["currentInput"]     = currentInput;
-        doc["currentOutput"]    = currentOutput;
-        doc["batteryPercent"]   = batteryPercent;
-        doc["Wh"]               = Wh;
-        doc["kWh"]              = kWh;
-        doc["MWh"]              = MWh;
-        doc["energySavings"]    = energySavings;
-        doc["peakPower"]        = peakPower;
-        
-        // System Status
-        doc["temperature"]      = temperature;
-        doc["fanStatus"]        = fanStatus;
-        doc["buckEnable"]       = buckEnable;
-        doc["bypassEnable"]     = bypassEnable;
-        doc["inputSource"]      = inputSource;
-        doc["chargeState"]      = chargeState;
-        doc["daysRunning"]      = daysRunning;
-        doc["secondsElapsed"]   = secondsElapsed;
-        doc["loopTime"]         = loopTime;
-        doc["outputDeviation"]  = outputDeviation;
-        
-        // PWM Data
-        doc["PWM"]              = PWM;
-        doc["PPWM"]             = PPWM;
-        doc["pwmMax"]           = pwmMax;
-        doc["pwmMaxLimited"]    = pwmMaxLimited;
-        
-        // Algorithm & Mode
-        doc["MPPT_Mode"]        = MPPT_Mode;
-        doc["output_Mode"]      = output_Mode;
-        
-        // Error Flags
-        doc["ERR"]              = ERR;
-        doc["FLV"]              = FLV;
-        doc["BNC"]              = BNC;
-        doc["IUV"]              = IUV;
-        doc["IOC"]              = IOC;
-        doc["OOV"]              = OOV;
-        doc["OOC"]              = OOC;
-        doc["OTE"]              = OTE;
-        doc["REC"]              = REC;
-        
-        // Current Configuration (so dashboard can display active settings)
-        doc["voltageBatteryMax"]  = voltageBatteryMax;
-        doc["voltageBatteryMin"]  = voltageBatteryMin;
-        doc["currentCharging"]   = currentCharging;
-        doc["enableFan"]         = enableFan;
-        doc["enableWiFi"]        = enableWiFi;
-        doc["temperatureFan"]    = temperatureFan;
-        doc["temperatureMax"]    = temperatureMax;
-        doc["backlightSleepMode"]= backlightSleepMode;
-        
-        String jsonResponse;
-        serializeJson(doc, jsonResponse);
-        
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/json", jsonResponse);
-        response->addHeader("Access-Control-Allow-Origin", "*");
-        request->send(response);
-      });
-
-      // =================== SETTINGS READ API ===================
-      // GET /api/settings - Returns current device configuration
-      server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request){
-        StaticJsonDocument<512> doc;
-        
-        doc["MPPT_Mode"]          = MPPT_Mode;
-        doc["output_Mode"]        = output_Mode;
-        doc["voltageBatteryMax"]  = voltageBatteryMax;
-        doc["voltageBatteryMin"]  = voltageBatteryMin;
-        doc["currentCharging"]    = currentCharging;
-        doc["enableFan"]          = enableFan;
-        doc["enableWiFi"]         = enableWiFi;
-        doc["temperatureFan"]     = temperatureFan;
-        doc["temperatureMax"]     = temperatureMax;
-        doc["backlightSleepMode"] = backlightSleepMode;
-        doc["enableLCD"]          = enableLCD;
-        doc["enableBluetooth"]    = enableBluetooth;
-        doc["flashMemLoad"]       = flashMemLoad;
-        doc["electricalPrice"]    = electricalPrice;
-        
-        String jsonResponse;
-        serializeJson(doc, jsonResponse);
-        
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/json", jsonResponse);
-        response->addHeader("Access-Control-Allow-Origin", "*");
-        request->send(response);
-      });
-
-      // =================== SETTINGS WRITE API ===================
-      // POST /api/settings - Updates device configuration and saves to EEPROM
-      server.on("/api/settings", HTTP_POST, 
-        [](AsyncWebServerRequest *request){},  // No body handler needed for form data
-        NULL,                                   // No upload handler
-        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
-          // Parse the incoming JSON body
-          StaticJsonDocument<512> doc;
-          DeserializationError error = deserializeJson(doc, data, len);
-          
-          if (error) {
-            AsyncWebServerResponse *response = request->beginResponse(400, "application/json", 
-              "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
-            response->addHeader("Access-Control-Allow-Origin", "*");
-            request->send(response);
-            return;
-          }
-          
-          // Update global variables from JSON payload
-          if (doc.containsKey("MPPT_Mode"))          MPPT_Mode          = doc["MPPT_Mode"];
-          if (doc.containsKey("output_Mode"))         output_Mode        = doc["output_Mode"];
-          if (doc.containsKey("voltageBatteryMax"))   voltageBatteryMax  = doc["voltageBatteryMax"];
-          if (doc.containsKey("voltageBatteryMin"))   voltageBatteryMin  = doc["voltageBatteryMin"];
-          if (doc.containsKey("currentCharging"))     currentCharging    = doc["currentCharging"];
-          if (doc.containsKey("enableFan"))           enableFan          = doc["enableFan"];
-          if (doc.containsKey("enableWiFi"))          enableWiFi         = doc["enableWiFi"];
-          if (doc.containsKey("temperatureFan"))      temperatureFan     = doc["temperatureFan"];
-          if (doc.containsKey("temperatureMax"))      temperatureMax     = doc["temperatureMax"];
-          if (doc.containsKey("backlightSleepMode"))  backlightSleepMode = doc["backlightSleepMode"];
-          
-          // Persist to EEPROM
-          saveSettings();
-          
-          Serial.println("> Settings updated from Web Dashboard");
-          
-          AsyncWebServerResponse *response = request->beginResponse(200, "application/json", 
-            "{\"status\":\"ok\",\"message\":\"Settings saved to EEPROM\"}");
-          response->addHeader("Access-Control-Allow-Origin", "*");
-          request->send(response);
-        }
-      );
-
-      // =================== FACTORY RESET API ===================
-      // POST /api/reset - Restores factory default settings
-      server.on("/api/reset", HTTP_POST, [](AsyncWebServerRequest *request){
-        factoryReset();
-        Serial.println("> Factory Reset triggered from Web Dashboard");
-        
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/json", 
-          "{\"status\":\"ok\",\"message\":\"Factory reset complete\"}");
-        response->addHeader("Access-Control-Allow-Origin", "*");
-        request->send(response);
-      });
-
-      // Start server
-      server.begin();
-      Serial.println("> Web API Server Started");
+      Serial.println("> Supabase Cloud Sync Enabled");
     } else {
       Serial.println("\n> WiFi Connection Failed.");
     }
   }
 }
 
-// AsyncWebServer handles everything in the background via interrupts.
-// This function runs on Core 0 but no active polling is needed.
+// Runs on Core 0
 void Wireless_Telemetry() {
-  delay(10); 
+  if (WiFi.status() == WL_CONNECTED && enableWiFi == 1) {
+    unsigned long currentMillis = millis();
+
+    // 1. PUSH TELEMETRY (Every 5 seconds)
+    if (currentMillis - lastTelemetrySync >= TELEMETRY_INTERVAL) {
+      lastTelemetrySync = currentMillis;
+      pushTelemetryToSupabase();
+    }
+
+    // 2. PULL SETTINGS (Every 10 seconds)
+    if (currentMillis - lastSettingsSync >= SETTINGS_INTERVAL) {
+      lastSettingsSync = currentMillis;
+      pullSettingsFromSupabase();
+    }
+  }
+  delay(10); // Yield to Watchdog
+}
+
+void pushTelemetryToSupabase() {
+  if (supabaseUrl == "https://your-project-id.supabase.co") return; // Not configured
+
+  HTTPClient http;
+  String url = supabaseUrl + "/rest/v1/telemetry_data?id=eq.1";
+  http.begin(url);
+  http.addHeader("apikey", supabaseKey);
+  http.addHeader("Authorization", "Bearer " + supabaseKey);
+  http.addHeader("Content-Type", "application/json");
+
+  // Create JSON payload
+  StaticJsonDocument<1024> doc;
+  doc["powerInput"]       = powerInput;
+  doc["powerOutput"]      = powerOutput;
+  doc["voltageInput"]     = voltageInput;
+  doc["voltageOutput"]    = voltageOutput;
+  doc["currentInput"]     = currentInput;
+  doc["currentOutput"]    = currentOutput;
+  doc["batteryPercent"]   = batteryPercent;
+  doc["Wh"]               = Wh;
+  doc["kWh"]              = kWh;
+  doc["MWh"]              = MWh;
+  doc["energySavings"]    = energySavings;
+  doc["peakPower"]        = peakPower;
+  
+  doc["temperature"]      = temperature;
+  doc["fanStatus"]        = fanStatus;
+  doc["buckEnable"]       = buckEnable;
+  doc["bypassEnable"]     = bypassEnable;
+  doc["inputSource"]      = inputSource;
+  doc["chargeState"]      = chargeState;
+  doc["daysRunning"]      = daysRunning;
+  doc["secondsElapsed"]   = secondsElapsed;
+  doc["loopTime"]         = loopTime;
+  doc["outputDeviation"]  = outputDeviation;
+  
+  doc["PWM"]              = PWM;
+  doc["PPWM"]             = PPWM;
+  doc["pwmMax"]           = pwmMax;
+  doc["pwmMaxLimited"]    = pwmMaxLimited;
+  
+  doc["MPPT_Mode"]        = MPPT_Mode;
+  doc["output_Mode"]      = output_Mode;
+  
+  doc["ERR"]              = ERR;
+  doc["FLV"]              = FLV;
+  doc["BNC"]              = BNC;
+  doc["IUV"]              = IUV;
+  doc["IOC"]              = IOC;
+  doc["OOV"]              = OOV;
+  doc["OOC"]              = OOC;
+  doc["OTE"]              = OTE;
+  doc["REC"]              = REC;
+
+  String requestBody;
+  serializeJson(doc, requestBody);
+
+  int httpResponseCode = http.PATCH(requestBody);
+  
+  if (httpResponseCode > 0) {
+    if (httpResponseCode != 200 && httpResponseCode != 204) {
+      Serial.print("> Supabase Telemetry Push Error: ");
+      Serial.println(httpResponseCode);
+    }
+  } else {
+    Serial.print("> Supabase Connection Error: ");
+    Serial.println(http.errorToString(httpResponseCode).c_str());
+  }
+  
+  http.end();
+}
+
+void pullSettingsFromSupabase() {
+  if (supabaseUrl == "https://your-project-id.supabase.co") return; // Not configured
+
+  HTTPClient http;
+  String url = supabaseUrl + "/rest/v1/device_settings?id=eq.1&select=*";
+  http.begin(url);
+  http.addHeader("apikey", supabaseKey);
+  http.addHeader("Authorization", "Bearer " + supabaseKey);
+
+  int httpResponseCode = http.GET();
+  
+  if (httpResponseCode == 200) {
+    String payload = http.getString();
+    
+    // Supabase returns an array for select queries: [{...}]
+    StaticJsonDocument<1024> doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    
+    if (!error && doc.size() > 0) {
+      JsonObject settings = doc[0];
+      
+      bool settingsChanged = false;
+      
+      // Factory Reset Check
+      if (settings["factoryResetTrigger"] == 1) {
+        Serial.println("> Factory Reset Triggered from Cloud!");
+        // Acknowledge the reset by clearing the flag in DB first
+        clearFactoryResetFlag();
+        factoryReset();
+        return;
+      }
+      
+      // Update variables if they exist in JSON
+      if (settings.containsKey("MPPT_Mode") && MPPT_Mode != settings["MPPT_Mode"].as<bool>()) {
+        MPPT_Mode = settings["MPPT_Mode"]; settingsChanged = true;
+      }
+      if (settings.containsKey("output_Mode") && output_Mode != settings["output_Mode"].as<bool>()) {
+        output_Mode = settings["output_Mode"]; settingsChanged = true;
+      }
+      if (settings.containsKey("voltageBatteryMax") && abs(voltageBatteryMax - settings["voltageBatteryMax"].as<float>()) > 0.01) {
+        voltageBatteryMax = settings["voltageBatteryMax"]; settingsChanged = true;
+      }
+      if (settings.containsKey("voltageBatteryMin") && abs(voltageBatteryMin - settings["voltageBatteryMin"].as<float>()) > 0.01) {
+        voltageBatteryMin = settings["voltageBatteryMin"]; settingsChanged = true;
+      }
+      if (settings.containsKey("currentCharging") && abs(currentCharging - settings["currentCharging"].as<float>()) > 0.01) {
+        currentCharging = settings["currentCharging"]; settingsChanged = true;
+      }
+      if (settings.containsKey("enableFan") && enableFan != settings["enableFan"].as<bool>()) {
+        enableFan = settings["enableFan"]; settingsChanged = true;
+      }
+      if (settings.containsKey("enableWiFi") && enableWiFi != settings["enableWiFi"].as<bool>()) {
+        enableWiFi = settings["enableWiFi"]; settingsChanged = true;
+      }
+      if (settings.containsKey("temperatureFan") && temperatureFan != settings["temperatureFan"].as<int>()) {
+        temperatureFan = settings["temperatureFan"]; settingsChanged = true;
+      }
+      if (settings.containsKey("temperatureMax") && temperatureMax != settings["temperatureMax"].as<int>()) {
+        temperatureMax = settings["temperatureMax"]; settingsChanged = true;
+      }
+      if (settings.containsKey("backlightSleepMode") && backlightSleepMode != settings["backlightSleepMode"].as<int>()) {
+        backlightSleepMode = settings["backlightSleepMode"]; settingsChanged = true;
+      }
+      
+      if (settingsChanged) {
+        Serial.println("> Cloud settings received! Saving to EEPROM.");
+        saveSettings();
+      }
+    }
+  }
+  
+  http.end();
+}
+
+void clearFactoryResetFlag() {
+  HTTPClient http;
+  String url = supabaseUrl + "/rest/v1/device_settings?id=eq.1";
+  http.begin(url);
+  http.addHeader("apikey", supabaseKey);
+  http.addHeader("Authorization", "Bearer " + supabaseKey);
+  http.addHeader("Content-Type", "application/json");
+
+  String requestBody = "{\"factoryResetTrigger\":0}";
+  http.PATCH(requestBody);
+  http.end();
 }

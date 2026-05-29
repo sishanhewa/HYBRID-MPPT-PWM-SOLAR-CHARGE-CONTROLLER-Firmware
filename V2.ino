@@ -11,19 +11,22 @@ firmwareContactR2 = "S.A.Wickramasinghe";
 #include <EEPROM.h>                 
 #include <Wire.h>                   
 #include <SPI.h>                    
-#include <WiFi.h>                   
-#include <AsyncTCP.h>               // NEW: Required for Async Web Server
-#include <ESPAsyncWebServer.h>      // NEW: Async Web Server Library
-#include <ArduinoJson.h>            // NEW: Used to package telemetry data
+#include <ArduinoJson.h>            // Use version 6.x
+#include <WiFi.h>                   // Standard WiFi Library
+#include <HTTPClient.h>             // Required for Supabase REST API requests
+
+// ========================================= SUPABASE CONFIG =======================================//
+// Enter your Supabase REST URL and ANON KEY here
+String supabaseUrl = "https://ynqmhkdnfhuqcoclwpbp.supabase.co";
+String supabaseKey = "sb_publishable_RhE5ukPZn4C2EPVc1ApndA_HIQjtbBk";
+// =================================================================================================//
+
 #include <LiquidCrystal_I2C.h>      
 #include <Adafruit_ADS1X15.h>       
 
 LiquidCrystal_I2C lcd(0x27,16,2);   
 TaskHandle_t Core2;                 
 Adafruit_ADS1015 ads;               
-
-// Create AsyncWebServer object on port 80
-AsyncWebServer server(80);
 
 //====================================== USER PARAMETERS ===========================================//
 #define backflow_MOSFET 27          
